@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#02070d">
+<title>J.A.R.V.I.S.</title>
+<style>
+  :root { --c:#27e1ff; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; }
+  body {
+    margin:0; min-height:100dvh; display:flex; flex-direction:column; overflow:hidden;
+    color:#d5f9ff; background:radial-gradient(ellipse at 50% 38%,#08273a 0%,#02070d 68%);
+    font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    padding:max(14px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right))
+            max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+  }
+  .top { display:flex; align-items:center; justify-content:space-between; }
+  .title { letter-spacing:.5em; font-weight:300; font-size:15px; color:var(--c); text-shadow:0 0 12px var(--c); padding-left:.5em; }
+  .gear { background:none; border:1px solid #14536a; color:#7fdcec; border-radius:10px; width:40px; height:40px; font-size:18px; cursor:pointer; }
+  .stage { flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; }
+  canvas#orb { width:min(84vw,42vh); height:min(84vw,42vh); }
+  #status { font-size:12px; letter-spacing:.22em; text-transform:uppercase; color:#7fdcec; text-align:center; padding:0 8px; }
+  #cap { min-height:3.4em; max-width:92%; text-align:center; font-size:17px; line-height:1.35; color:#eafcff; }
+  #act { min-height:44px; }
+  #act a { display:inline-block; padding:11px 22px; border:1px solid var(--c); border-radius:999px; color:var(--c); text-decoration:none; font-size:15px; }
+  #err { margin:0 auto 10px; max-width:440px; padding:10px 14px; border-radius:12px; font-size:13.5px; line-height:1.45;
+         background:rgba(255,110,110,.12); border:1px solid rgba(255,110,110,.5); color:#ffc9c9; }
+  .note { font-size:12px; color:#5f9fae; text-align:center; min-height:1.5em; margin-bottom:10px; padding:0 8px; }
+  .main {
+    width:100%; max-width:440px; align-self:center; height:58px; font-size:15px; letter-spacing:.3em; cursor:pointer;
+    background:rgba(39,225,255,.08); color:var(--c); border:1px solid var(--c); border-radius:999px;
+    box-shadow:0 0 16px rgba(39,225,255,.35), inset 0 0 14px rgba(39,225,255,.12);
+  }
+  .main:active { background:rgba(39,225,255,.22); }
+  .main.on { color:#ff7b7b; border-color:#ff7b7b; background:rgba(255,123,123,.07); box-shadow:0 0 16px rgba(255,123,123,.35); }
+  #sheet { position:fixed; left:0; right:0; bottom:0; max-height:82dvh; overflow:auto; background:#04141f; border-top:1px solid #14536a;
+           border-radius:18px 18px 0 0; padding:18px max(18px,env(safe-area-inset-right)) max(22px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));
+           display:flex; flex-direction:column; gap:12px; box-shadow:0 -10px 40px rgba(0,0,0,.6); }
+  #sheet[hidden] { display:none; }
+  #sheet label { font-size:13px; color:#8fcfdc; display:flex; flex-direction:column; gap:6px; }
+  input, select { background:#02101a; color:#d5f9ff; border:1px solid #14536a; border-radius:10px; padding:12px; font-size:16px; width:100%; }
+  .small { background:rgba(39,225,255,.1); color:var(--c); border:1px solid var(--c); border-radius:10px; padding:12px; font-size:14px; letter-spacing:.12em; cursor:pointer; }
+  .hint { font-size:12.5px; line-height:1.55; color:#6aa9b8; }
+  code { color:#9fe9f7; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="title">J.A.R.V.I.S.</div>
+  <button class="gear" id="gear" aria-label="Settings">⚙</button>
+</div>
+
+<div class="stage">
+  <canvas id="orb"></canvas>
+  <div id="status">OFFLINE</div>
+  <div id="cap"></div>
+  <div id="act"></div>
+</div>
+
+<div id="err" hidden></div>
+<div class="note" id="note">Tap ACTIVATE, then say "Hey Jarvis".</div>
+<button class="main" id="btn">ACTIVATE</button>
+
+<div id="sheet" hidden>
+  <label>Listening language
+    <select id="lang">
+      <option value="en-IN">English (India)</option>
+      <option value="en-US">English (US)</option>
+      <option value="en-GB">English (UK)</option>
+    </select>
+  </label>
+  <label>Anthropic API key (optional, lets Jarvis answer anything)
+    <input id="key" type="password" placeholder="sk-ant-..." autocomplete="off">
+  </label>
+  <button class="small" id="saveKey">SAVE</button>
+  <div class="hint">
+    Works without a key: time, date, timers, math, jokes, "open YouTube", "search for ...", "play ...".<br><br>
+    Phones stop web pages from listening once you leave the page or lock the screen. While Jarvis is active the screen stays on, so keep this page open (a dock or stand works well).<br><br>
+    Use Chrome on Android. If the microphone is blocked when this file is opened from Downloads, host it over HTTPS (Netlify Drop or GitHub Pages), or in Termux run <code>python -m http.server 8000</code> in the folder and open <code>http://localhost:8000/jarvis-mobile.html</code>.<br><br>
+    Say "go to sleep" for standby or "shut down" to turn it off.
+  </div>
+  <button class="small" id="closeSheet">CLOSE</button>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const MODEL = 'claude-haiku-5-5';
+const WAKE = /\b(?:(?:hey|ok|okay)\s+)?(?:jarvis|jarvas|jarvus|jarvice|travis)\b/i;
+
+let state = 'off';                       // off | standby | awake | thinking | speaking
+let active = false, wantRec = false, running = false, speaking = false;
+let rec = null, awakeTimer = null, ac = null, wl = null, history = [], nextState = null;
+
+/* ---------- UI helpers ---------- */
+const STATUS = {
+  off: 'OFFLINE', standby: 'STANDING BY · SAY "HEY JARVIS"', awake: 'LISTENING…',
+  thinking: 'PROCESSING…', speaking: 'SPEAKING'
+};
+function setState(s) { state = s; $('status').textContent = STATUS[s]; }
+function cap(t) { $('cap').textContent = t; }
+function note(t) { $('note').textContent = t; }
+function showErr(t) { const e = $('err'); e.textContent = t; e.hidden = false; }
+function hideErr() { $('err').hidden = true; }
+function showAct(url, label) {
+  const box = $('act'); box.textContent = '';
+  const a = document.createElement('a');
+  a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = label;
+  box.append(a);
+}
+function clearAct() { $('act').textContent = ''; }
+
+if (!SR) showErr('Voice does not work in this viewer. Tap the ⋮ menu and choose "Open in Chrome", or open the downloaded file with Chrome.');
+else if (!window.isSecureContext) showErr('This page is not running in a secure context, so the microphone may be blocked. See Settings for how to host it over HTTPS.');
+
+/* ---------- orb ---------- */
+const cv = $('orb'), ctx = cv.getContext('2d');
+const S = 320, dpr = Math.min(2, window.devicePixelRatio || 1);
+cv.width = cv.height = S * dpr; ctx.scale(dpr, dpr);
+const PAL = { off:[90,120,140], standby:[39,225,255], awake:[120,255,220], thinking:[255,170,50], speaking:[39,225,255] };
+let t = 0, lvl = 0;
+
+function draw() {
+  t += 0.016;
+  const [r,g,b] = PAL[state];
+  const col = a => `rgba(${r},${g},${b},${Math.max(0,Math.min(1,a))})`;
+  const speed = { off:.1, standby:.35, awake:1, thinking:2.2, speaking:.8 }[state];
+  const target = {
+    off:.04, standby:.14 + .04*Math.sin(t*1.5), awake:.45 + .25*Math.sin(t*6),
+    thinking:.3, speaking:.45 + .45*Math.abs(Math.sin(t*9))*Math.random()
+  }[state];
+  lvl += (target - lvl) * .12;
+  ctx.clearRect(0,0,S,S); ctx.save(); ctx.translate(S/2, S/2);
+
+  const gr = ctx.createRadialGradient(0,0,5,0,0,110 + lvl*40);
+  gr.addColorStop(0, col(.9*(.3+lvl))); gr.addColorStop(.5, col(.25*(.3+lvl) + .05)); gr.addColorStop(1, col(0));
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0,0,155,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = col(.55 + lvl*.4); ctx.beginPath(); ctx.arc(0,0,20 + lvl*16,0,Math.PI*2); ctx.fill();
+
+  const ring = (rad, w, dash, rot, a) => {
+    ctx.save(); ctx.rotate(rot); ctx.setLineDash(dash); ctx.lineWidth = w; ctx.strokeStyle = col(a);
+    ctx.beginPath(); ctx.arc(0,0,rad,0,Math.PI*2); ctx.stroke(); ctx.restore();
+  };
+  ring(48 + lvl*8, 2, [], 0, .9);
+  ring(70, 3, [40,18], t*speed, .8);
+  ring(90, 2, [6,10], -t*speed*1.4, .7);
+  ring(110, 4, [90,40,20,40], t*speed*.7, .6);
+  ring(124, 1.5, [2,6], -t*speed*.5, .5);
+
+  if (state === 'thinking') {
+    ctx.setLineDash([]); ctx.lineWidth = 6; ctx.strokeStyle = col(1);
+    ctx.beginPath(); ctx.arc(0,0,140, t*4, t*4 + 1.2); ctx.stroke();
+  }
+  ctx.setLineDash([]); ctx.lineWidth = 2; ctx.strokeStyle = col(.7);
+  const bars = 56, live = (state === 'speaking' || state === 'awake');
+  for (let i = 0; i < bars; i++) {
+    const a = i / bars * Math.PI * 2;
+    const h = live ? 3 + lvl*20*Math.abs(Math.sin(a*5 + t*8)) : 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a)*130, Math.sin(a)*130);
+    ctx.lineTo(Math.cos(a)*(130+h), Math.sin(a)*(130+h));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+(function loop() { draw(); requestAnimationFrame(loop); })();
+
+/* ---------- sound & screen ---------- */
+function tone(f1, f2, d = .18) {
+  if (!ac) return;
+  try {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f1, ac.currentTime);
+    o.frequency.linearRampToValueAtTime(f2, ac.currentTime + d);
+    g.gain.setValueAtTime(.12, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + d);
+    o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + d);
+  } catch (_) {}
+}
+async function lockScreen() {
+  try {
+    if (!('wakeLock' in navigator) || wl) return;
+    wl = await navigator.wakeLock.request('screen');
+    wl.addEventListener('release', () => { wl = null; });
+  } catch (_) {}
+}
+function unlockScreen() { try { wl && wl.release(); } catch (_) {} wl = null; }
+
+/* ---------- speech out ---------- */
+let voice = null;
+function pickVoice() {
+  const vs = speechSynthesis.getVoices();
+  voice = vs.find(v => /Daniel|UK English Male|Arthur|Oliver/i.test(v.name))
+       || vs.find(v => /en-GB/i.test(v.lang))
+       || vs.find(v => /en-IN/i.test(v.lang))
+       || vs.find(v => /^en/i.test(v.lang)) || null;
+}
+if ('speechSynthesis' in window) { speechSynthesis.onvoiceschanged = pickVoice; pickVoice(); }
+
+function pauseRec() { try { rec && rec.abort(); } catch (_) {} }
+
+function say(text) {
+  return new Promise(res => {
+    const back = (state === 'awake' || state === 'thinking') ? 'awake' : 'standby';
+    if (!('speechSynthesis' in window)) {          // no voice output here: show the text instead
+      speaking = true; pauseRec(); setState('speaking'); cap(text);
+      setTimeout(() => { speaking = false; if (active) setState(back); res(); startRec(); }, Math.max(1500, text.length * 60));
+      return;
+    }
+    speechSynthesis.cancel();
+    speaking = true; pauseRec(); setState('speaking'); cap(text);
+    const u = new SpeechSynthesisUtterance(text);
+    if (voice) u.voice = voice;
+    u.lang = voice ? voice.lang : 'en-GB'; u.rate = 1.03; u.pitch = .9;
+    let fin = false, wd = null;
+    const done = () => {
+      if (fin) return; fin = true; clearTimeout(wd);
+      speaking = false;
+      if (active) setState(back);
+      setTimeout(() => { res(); startRec(); }, 400);
+    };
+    u.onend = done; u.onerror = done;
+    wd = setTimeout(done, Math.max(4000, text.length * 90));   // some phones never fire onend
+    speechSynthesis.speak(u);
+  });
+}
+
+/* ---------- listening ---------- */
+function startRec() {
+  if (!SR || !wantRec || running || speaking) return;
+  rec = new SR();
+  rec.continuous = false;               // most reliable on Android; we restart after every phrase
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+  rec.lang = $('lang').value;
+  rec.onstart = () => { running = true; hideErr(); };
+  rec.onresult = e => {
+    if (speaking || state === 'thinking') return;
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i], txt = r[0].transcript.trim();
+      if (!r.isFinal) { if (state === 'awake') cap('You: ' + txt); continue; }
+      if (txt) handleFinal(txt);
+    }
+  };
+  rec.onerror = e => {
+    if (e.error === 'no-speech' || e.error === 'aborted') return;
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      showErr('Microphone is blocked. Tap the lock icon in the address bar, allow Microphone, then press ACTIVATE again. If this file is opened from Downloads, host it over HTTPS (see Settings).');
+      deactivate(true); return;
+    }
+    if (e.error === 'audio-capture') { showErr('No microphone available. Another app may be using it.'); return; }
+    if (e.error === 'network') { showErr('Voice recognition needs an internet connection. Retrying…'); return; }
+    if (e.error === 'language-not-supported') { showErr('That language is not supported on this phone. Pick another in Settings.'); return; }
+    showErr('Voice error: ' + e.error);
+  };
+  rec.onend = () => {
+    running = false;
+    if (wantRec && !speaking) setTimeout(startRec, 300);
+  };
+  try { rec.start(); } catch (_) { running = false; }
+}
+
+function armAwake(ms = 7000) {
+  setState('awake'); clearTimeout(awakeTimer);
+  awakeTimer = setTimeout(() => { if (state === 'awake') { setState('standby'); cap(''); } }, ms);
+}
+async function wakeUp() {
+  tone(520, 900); armAwake(9000);
+  await say('Yes?'); armAwake(8000);
+}
+function handleFinal(txt) {
+  const m = txt.match(WAKE);
+  let cmd = txt;
+  if (m) {
+    const before = txt.slice(0, m.index).trim();
+    const after = txt.slice(m.index + m[0].length).replace(/^[\s,.!?:-]+/, '').trim();
+    cmd = after || before;
+  } else if (state === 'standby') {
+    return;                                   // not addressed to Jarvis
+  }
+  if (!cmd) return wakeUp();
+  if (state === 'standby') tone(520, 900);
+  runCommand(cmd);
+}
+
+/* ---------- commands ---------- */
+const SITES = {
+  youtube:'youtube.com', google:'google.com', gmail:'mail.google.com', maps:'maps.google.com',
+  'google maps':'maps.google.com', github:'github.com', twitter:'x.com', x:'x.com', instagram:'instagram.com',
+  facebook:'facebook.com', netflix:'netflix.com', claude:'claude.ai', linkedin:'linkedin.com',
+  reddit:'reddit.com', spotify:'open.spotify.com', amazon:'amazon.in', wikipedia:'wikipedia.org'
+};
+const JOKES = [
+  "Why do programmers prefer dark mode? Because light attracts bugs.",
+  "I would tell you a UDP joke, but you might not get it.",
+  "There are only ten kinds of people: those who understand binary and those who don't.",
+  "Why did the developer go broke? He used up all his cache.",
+  "I told my computer I needed a break. It said no problem, and went to sleep."
+];
+
+// Browsers often block pop-ups that don't come from a tap. If so, show a tap-to-open button.
+function openUrl(url, label) {
+  let w = null;
+  try { w = window.open(url, '_blank'); } catch (_) {}
+  if (w) return true;
+  showAct(url, 'Tap to open ' + label);
+  return false;
+}
+const BLOCKED = 'Tap the button on screen to open it.';
+
+function mathReply(low) {
+  const s = low.replace(/^(what is|what's|calculate|compute)\s+/, '')
+    .replace(/plus/g,'+').replace(/minus/g,'-').replace(/(multiplied by|times| x )/g,'*')
+    .replace(/divided by|over/g,'/').replace(/\s+/g,'');
+  if (!/^[\d.+\-*/()]+$/.test(s) || !/\d[+\-*/]\d|\)[+\-*/]|[+\-*/]\(/.test(s)) return null;
+  try {
+    const v = Function('"use strict";return (' + s + ')')();
+    if (!isFinite(v)) return null;
+    return 'That is ' + (Math.round(v * 1e6) / 1e6);
+  } catch (_) { return null; }
+}
+
+function local(low) {
+  let m;
+  if (/^(shut ?down|deactivate|turn off|power off|goodbye|good bye)\b/.test(low)) { nextState = 'off'; return 'Shutting down. Goodbye.'; }
+  if (/^(go to sleep|stand down|that'?s all|never ?mind|stop listening)\b/.test(low)) { nextState = 'standby'; return 'Standing by.'; }
+  if (/^(thanks|thank you)\b/.test(low)) { nextState = 'standby'; return "You're welcome."; }
+  if (/^(hi|hello|hey|good (morning|afternoon|evening))\b/.test(low)) return 'Hello! How can I help?';
+  if (/\b(what('s| is) the time|current time|time is it|time now)\b/.test(low))
+    return 'It is ' + new Date().toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });
+  if (/\b(what('s| is) (the )?date|today'?s date|what day)\b/.test(low))
+    return 'Today is ' + new Date().toLocaleDateString([], { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  if (/\b(who are you|your name)\b/.test(low)) return "I'm Jarvis, your personal assistant.";
+  if (/\bjoke\b/.test(low)) return JOKES[Math.floor(Math.random() * JOKES.length)];
+
+  if ((m = low.match(/(?:timer|remind me)(?: for| in)? (\d+|an?|one) (second|minute|hour)s?/))) {
+    const n = /^\d+$/.test(m[1]) ? +m[1] : 1;
+    const ms = n * { second:1000, minute:60000, hour:3600000 }[m[2]];
+    setTimeout(async () => { if (!active) return; tone(880, 880, .4); await say('Your timer is up.'); }, ms);
+    return `Timer set for ${n} ${m[2]}${n > 1 ? 's' : ''}.`;
+  }
+  if ((m = low.match(/^open (.+)/))) {
+    const name = m[1].trim().replace(/^(the|a)\s+/, '').replace(/\s+(website|site|app)$/, '');
+    const url = SITES[name] ? 'https://' + SITES[name]
+      : /\.\w{2,}$/.test(name) ? 'https://' + name.replace(/\s+/g, '')
+      : 'https://www.google.com/search?q=' + encodeURIComponent(name);
+    return openUrl(url, name) ? 'Opening ' + name + '.' : BLOCKED;
+  }
+  if ((m = low.match(/^(?:search|google|look up)(?: for)? (.+)/))) {
+    return openUrl('https://www.google.com/search?q=' + encodeURIComponent(m[1]), 'the search')
+      ? 'Searching for ' + m[1] + '.' : BLOCKED;
+  }
+  if ((m = low.match(/^play (.+)/))) {
+    return openUrl('https://www.youtube.com/results?search_query=' + encodeURIComponent(m[1]), 'YouTube')
+      ? 'Searching YouTube for ' + m[1] + '.' : BLOCKED;
+  }
+  return mathReply(low);
+}
+
+async function smart(cmd) {
+  let key = '';
+  try { key = localStorage.getItem('jarvis_key') || ''; } catch (_) {}
+  if (!key) return "I can handle basic commands like time, timers, opening sites and searches. Add your API key in settings so I can answer anything.";
+  history.push({ role:'user', content:cmd });
+  history = history.slice(-12);
+  while (history[0] && history[0].role !== 'user') history.shift();
+  const sys = "You are JARVIS, a calm, witty voice assistant. Your replies are spoken aloud: use one to three short sentences, plain words, no markdown, no lists, no emojis. Today is " + new Date().toDateString() + ".";
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{
+        'content-type':'application/json', 'x-api-key':key, 'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body: JSON.stringify({ model:MODEL, max_tokens:220, system:sys, messages:history })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error((j.error && j.error.message) || r.status);
+    const txt = j.content.map(c => c.text || '').join('').trim();
+    history.push({ role:'assistant', content:txt });
+    return txt;
+  } catch (e) {
+    history.pop();
+    return 'I could not reach my brain. ' + String(e.message).slice(0, 90);
+  }
+}
+
+async function runCommand(cmd) {
+  clearTimeout(awakeTimer); clearAct();
+  cap('You: ' + cmd);
+  const low = cmd.toLowerCase().replace(/[?.!,]+$/g, '').trim();
+  nextState = null;
+  setState('thinking');
+  let reply = local(low);
+  if (reply === null) reply = await smart(cmd);
+  await say(reply);
+  if (nextState === 'off') return deactivate();
+  if (nextState === 'standby') { setState('standby'); cap(''); return; }
+  armAwake(7000);
+}
+
+/* ---------- activate / deactivate ---------- */
+function activate() {
+  if (!SR) { showErr('Voice does not work in this viewer. Tap the ⋮ menu and choose "Open in Chrome", or open the downloaded file with Chrome.'); return; }
+  hideErr(); clearAct();
+  try { ac = new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (_) {}
+  active = true; wantRec = true;
+  $('btn').textContent = 'DEACTIVATE'; $('btn').classList.add('on');
+  note('Keep this page open. The screen stays on while Jarvis is active.');
+  setState('standby'); cap('Online. Say "Hey Jarvis".');
+  lockScreen(); tone(440, 880, .3);
+  startRec();                                         // starts inside the tap so the mic prompt can appear
+  try {                                               // quick greeting, also unlocks speech on iPhones
+    speaking = true;
+    const u = new SpeechSynthesisUtterance('Jarvis online.');
+    if (voice) u.voice = voice;
+    u.pitch = .9;
+    const end = () => { speaking = false; };
+    u.onend = end; u.onerror = end; setTimeout(end, 3000);
+    speechSynthesis.speak(u);
+  } catch (_) { speaking = false; }
+}
+function deactivate(keepErr) {
+  active = false; wantRec = false; clearTimeout(awakeTimer);
+  pauseRec(); try { speechSynthesis.cancel(); } catch (_) {}
+  speaking = false; running = false;
+  unlockScreen(); clearAct();
+  setState('off'); cap('');
+  if (!keepErr) hideErr();
+  $('btn').textContent = 'ACTIVATE'; $('btn').classList.remove('on');
+  note('Tap ACTIVATE, then say "Hey Jarvis".');
+}
+$('btn').onclick = () => active ? deactivate() : activate();
+
+document.addEventListener('visibilitychange', () => {
+  if (!active) return;
+  if (document.visibilityState === 'visible') { lockScreen(); startRec(); }
+  else { note('Paused while you are away. Come back to this page and Jarvis resumes.'); }
+});
+
+/* ---------- settings ---------- */
+try { $('key').value = localStorage.getItem('jarvis_key') || ''; $('lang').value = localStorage.getItem('jarvis_lang') || 'en-IN'; } catch (_) {}
+$('gear').onclick = () => { $('sheet').hidden = !$('sheet').hidden; };
+$('closeSheet').onclick = () => { $('sheet').hidden = true; };
+function restartRec() { if (active) { pauseRec(); } }
+$('saveKey').onclick = () => {
+  try { localStorage.setItem('jarvis_key', $('key').value.trim()); localStorage.setItem('jarvis_lang', $('lang').value); } catch (_) {}
+  $('saveKey').textContent = 'SAVED';
+  setTimeout(() => { $('saveKey').textContent = 'SAVE'; }, 1200);
+  restartRec();
+};
+$('lang').onchange = () => { try { localStorage.setItem('jarvis_lang', $('lang').value); } catch (_) {} restartRec(); };
+</script>
+</body>
+</html>
